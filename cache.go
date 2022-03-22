@@ -117,6 +117,15 @@ func (cache *Cache) getItem(key string) (*item, bool, bool) {
 	return item, exists, expirationNotification
 }
 
+func (cache *Cache) getItemDry(key string) (*item, bool, bool) {
+	item, exists := cache.items[key]
+	if !exists || item.expired() {
+		return nil, false, false
+	}
+
+	return item, exists, false
+}
+
 func (cache *Cache) startExpirationProcessing() {
 	timer := time.NewTimer(time.Hour)
 	for {
@@ -468,6 +477,24 @@ func (cache *Cache) GetItems() map[string]interface{} {
 	items := make(map[string]interface{}, len(cache.items))
 	for k := range cache.items {
 		item, exists, _ := cache.getItem(k)
+		if exists {
+			items[k] = item.data
+		}
+	}
+	return items
+}
+
+// GetItems returns a copy of all items in the cache. Returns nil when the cache has been closed.
+func (cache *Cache) GetItemsDry() map[string]interface{} {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+
+	if cache.isShutDown {
+		return nil
+	}
+	items := make(map[string]interface{}, len(cache.items))
+	for k := range cache.items {
+		item, exists, _ := cache.getItemDry(k)
 		if exists {
 			items[k] = item.data
 		}
